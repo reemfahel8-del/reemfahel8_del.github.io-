@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+  <meta charset="UTF-8" />
+  <title>دليل الحواجز في الضفة الغربية</title>
+
+  <!-- Leaflet -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
+  <!-- MarkerCluster -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster/dist/MarkerCluster.css">
+  <script src="https://unpkg.com/leaflet.markercluster/dist/leaflet.markercluster.js"></script>
+
+  <!-- Routing -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.css" />
+  <script src="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.js"></script>
+
+  <style>
+    body {
+      margin: 0;
+      font-family: "Segoe UI", Tahoma;
+    }
+
+    #map {
+      height: 100vh;
+    }
+
+    .welcome {
+      position: absolute;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: white;
+      padding: 10px 20px;
+      z-index: 1000;
+      border-radius: 8px;
+      font-weight: bold;
+    }
+
+    .search-box, .status-box, .feedback-box {
+      position: absolute;
+      background: white;
+      padding: 10px;
+      border-radius: 8px;
+      z-index: 1000;
+    }
+
+    .search-box {
+      top: 80px;
+      left: 10px;
+    }
+
+    .status-box {
+      top: 160px;
+      left: 10px;
+    }
+
+    .feedback-box {
+      bottom: 20px;
+      left: 10px;
+      width: 250px;
+    }
+  </style>
+</head>
+
+<body>
+
+<div class="welcome">لطريق آمن افتح التطبيق</div>
+
+<div class="search-box">
+  <input type="text" id="search" placeholder="ابحث عن حاجز" />
+</div>
+
+<div class="status-box">
+  <b>حالة الحواجز</b><br>
+  <button onclick="filterStatus('open')">مفتوح</button>
+  <button onclick="filterStatus('closed')">مغلق</button>
+  <button onclick="filterStatus('traffic')">ازدحام</button>
+</div>
+
+<div class="feedback-box">
+  <b>ملاحظات المستخدم</b><br>
+  <textarea rows="4" style="width:100%" placeholder="اكتب رأيك هنا"></textarea>
+  <button style="margin-top:5px;width:100%">إرسال</button>
+</div>
+
+<div id="map"></div>
+
+<script>
+  // الخريطة
+  var map = L.map('map').setView([31.9, 35.2], 9);
+
+  // BaseMap
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap'
+  }).addTo(map);
+
+  // Scale
+  L.control.scale().addTo(map);
+
+  // Cluster
+  var cluster = L.markerClusterGroup();
+
+  function checkpointIcon(color) {
+    return L.icon({
+      iconUrl: `https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-${color}.png`,
+      iconSize: [25, 41],
+      iconAnchor: [12, 41]
+    });
+  }
+
+  var checkpointsLayer;
+
+  fetch("data/checkpoints.geojson")
+    .then(res => res.json())
+    .then(data => {
+      checkpointsLayer = L.geoJSON(data, {
+        pointToLayer: function (feature, latlng) {
+          let status = feature.properties.status;
+          let color = status === "open" ? "green" :
+                      status === "closed" ? "red" : "orange";
+
+          return L.marker(latlng, { icon: checkpointIcon(color) })
+            .bindPopup(`<b>${feature.properties.name}</b><br>الحالة: ${status}`);
+        }
+      });
+
+      cluster.addLayer(checkpointsLayer);
+      map.addLayer(cluster);
+    });
+
+  function filterStatus(status) {
+    cluster.clearLayers();
+    checkpointsLayer.eachLayer(layer => {
+      if (layer.feature.properties.status === status) {
+        cluster.addLayer(layer);
+      }
+    });
+  }
+
+  // تحديد الموقع والمسار
+  var control = L.Routing.control({
+    waypoints: [],
+    routeWhileDragging: true,
+    show: false
+  }).addTo(map);
+
+  map.on('click', function (e) {
+    if (control.getWaypoints().length < 2) {
+      control.spliceWaypoints(control.getWaypoints().length, 1, e.latlng);
+    }
+  });
+
+</script>
+
+</body>
+</html>
